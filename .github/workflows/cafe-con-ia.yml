@@ -1,7 +1,7 @@
 name: cafe-con-ia-daily
 on:
   schedule:
-    - cron: "30 11 * * *"   # 07:30 America/Toronto
+    - cron: "30 11 * * *"   # 07:30 America/Toronto (EDT)
   workflow_dispatch: {}
 jobs:
   run:
@@ -10,13 +10,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm install --no-audit --no-fund
-      - run: node index.js
+        with: { node-version: 20 }
+
+      # Debug útil (déjalo al principio mientras pruebas)
+      - name: Debug files
+        run: |
+          pwd
+          ls -la
+          echo "TEMPLATE_PATH=${{ env.TEMPLATE_PATH }}"
+          find . -maxdepth 3 -type f -name "email.html" -o -name "index.js" -o -name "package.json" | sed 's|^|• |'
+
+      # Instalación segura (sin lock usa install)
+      - name: Install deps (ci if lockfile, else install)
+        run: |
+          if [ -f package-lock.json ]; then
+            echo "Found package-lock.json → npm ci"
+            npm ci --no-audit --no-fund
+          else
+            echo "No package-lock.json → npm install"
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Run script
         env:
           TZ: America/Toronto
           FEEDS: ${{ secrets.FEEDS }}
           RECIPIENTS: ${{ secrets.RECIPIENTS }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
+          TEMPLATE_PATH: templates/email.html
+        run: node index.js
